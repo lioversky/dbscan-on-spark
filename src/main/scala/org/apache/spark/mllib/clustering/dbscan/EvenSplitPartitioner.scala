@@ -73,9 +73,10 @@ class EvenSplitPartitioner(
     logTrace("About to start partitioning")
     val partitions = partition(toPartition, partitioned)
     logTrace("Done")
-
+    pointsInRectangleMap.clear()
     // remove empty partitions
     partitions.filter({ case (partition, count) => count > 0 })
+
   }
 
   /**
@@ -276,6 +277,7 @@ class EvenSplitPartitioner(
 
   def splitEmptyRectangle(box: DBSCANRectangle, rectanglesWithCount: Set[RectangleWithCount]): DBSCANRectangle = {
     val count = rectanglesWithCount.foldLeft(0) { case (total, (_, count)) => total + count }
+    if(count==0) return box
     val result = if (canBeSplit(box)) {
       val splits = box.array.map { case (x, y) => {
         val split = (x + eps) until y by eps

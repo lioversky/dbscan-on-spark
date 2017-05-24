@@ -44,7 +44,7 @@ case class DBSCANRectangle(val array: Array[(Double, Double)]) {
   def contains(point: DBSCANPoint): Boolean = {
     var flag = true
     for (((x1, y1), x) <- array.zip(point.vector.toArray) if flag) {
-      if (x != 0 && (x1 >= x || y1 < x)) flag = false
+      if (x != 0 && (x1 > x || y1 <= x)) flag = false
     }
     flag
 

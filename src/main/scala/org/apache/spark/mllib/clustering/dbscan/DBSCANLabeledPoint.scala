@@ -32,16 +32,16 @@ object DBSCANLabeledPoint {
 
 }
 
-class DBSCANLabeledPoint(vector: Vector) extends DBSCANPoint(vector) {
+class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector,pointId:Long) {
 
-  def this(point: DBSCANPoint) = this(point.vector)
+  def this(point: DBSCANPoint) = this(point.vector,point.pointId)
 
   var flag = DBSCANLabeledPoint.Flag.NotFlagged
   var cluster = DBSCANLabeledPoint.Unknown
   var visited = false
 
   override def toString(): String = {
-    s"$vector,$cluster,$flag"
+    s"$vector,$pointId,$cluster,$flag"
   }
 
 }

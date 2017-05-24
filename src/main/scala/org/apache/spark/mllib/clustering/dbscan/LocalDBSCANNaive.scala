@@ -32,7 +32,7 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
   val minDistanceSquared = eps * eps
 
-  def samplePoint = Array(new DBSCANLabeledPoint(Vectors.dense(Array(0D, 0D))))
+//  def samplePoint = Array(new DBSCANLabeledPoint(Vectors.dense(Array(0D, 0D))))
 
   def fit(points: Iterable[DBSCANPoint]): Iterable[DBSCANLabeledPoint] = {
     val size = points.size
@@ -106,6 +106,8 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
             neighbor.cluster = cluster
             neighbor.flag = Flag.Border
           }
+        }else {
+          if(neighbor.flag == Flag.Noise) neighbor.flag = Flag.Border
         }
 
       })

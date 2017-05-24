@@ -19,7 +19,7 @@ package org.apache.spark.mllib.clustering.dbscan
 import org.apache.commons.math3.util.MathArrays
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
-case class DBSCANPoint(val vector: Vector) {
+case class DBSCANPoint(val vector: Vector,pointId:Long) {
 
 //    def x = vector(0)
 //
@@ -42,9 +42,3 @@ case class DBSCANPoint(val vector: Vector) {
   }
 
 }
-object DBSCANPoint1{
-  def main(args: Array[String]): Unit = {
-    println(MathArrays.distance(Array(0.1,0.0,0), Array(0.2,0.0,0.3)))
-  }
-}
-

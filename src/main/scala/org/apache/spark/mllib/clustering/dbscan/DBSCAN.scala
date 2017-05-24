@@ -53,12 +53,11 @@ object DBSCAN {
             .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
         }
 //        (uid,arr)
-        Vectors.dense(arr)
+        DBSCANPoint(Vectors.dense(arr),uid)
       }
     data.cache()
     val model = train(data,0.1,20,2000)
     textdata.unpersist()
-//    model.labeledPoints.collect().foreach(println)
     model.labeledPoints.sortBy(_.cluster).saveAsTextFile(args(1))
 
     spark.stop()
@@ -75,7 +74,7 @@ object DBSCAN {
    * @param maxPointsPerPartition the largest number of points in a single partition
    */
   def train(
-    data: RDD[Vector],
+    data: RDD[DBSCANPoint],
     eps: Double,
     minPoints: Int,
     maxPointsPerPartition: Int): DBSCAN = {
@@ -115,13 +114,13 @@ class DBSCAN private (
     labeledPartitionedPoints.values
   }
 
-  private def train(vectors: RDD[Vector]): DBSCAN = {
+  private def train(points: RDD[DBSCANPoint]): DBSCAN = {
 
     // generate the smallest rectangles that split the space
     // and count how many points are contained in each one of them
     val minimumRectanglesWithCount =
-      vectors
-        .map(DBSCANRectangle.toMinimumBoundingRectangle(_,minimumRectangleSize))
+    points
+        .map(p=>DBSCANRectangle.toMinimumBoundingRectangle(p.vector,minimumRectangleSize))
         .filter(!_.empty())
         .map((_, 1))
         .aggregateByKey(0)(_ + _, _ + _)
@@ -146,20 +145,17 @@ class DBSCAN private (
         .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
         .zipWithIndex
     println(" localMargins spend time :" + (System.currentTimeMillis()-start))
-    val margins = vectors.context.broadcast(localMargins)
+    val margins = points.context.broadcast(localMargins)
 
     // assign each point to its proper partition
     val duplicated = for {
-      point <- vectors.map(DBSCANPoint)
+      point <- points
       ((inner, main, outer), id) <- margins.value
       if main.contains(point)
     } yield (id, point)
 
 
     val numOfPartitions = localPartitions.size
-    val r = duplicated
-      .groupByKey(numOfPartitions)
-      .mapValues(_.size).collectAsMap()
 //  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =
@@ -232,7 +228,7 @@ class DBSCAN private (
     clusterIdToGlobalId.foreach(e => logDebug(e.toString))
     logInfo(s"Total Clusters: ${localClusterIds.size}, Unique: $total")
 
-    val clusterIds = vectors.context.broadcast(clusterIdToGlobalId)
+    val clusterIds = points.context.broadcast(clusterIdToGlobalId)
 
     logDebug("About to relabel inner points")
     // relabel non-duplicated points
