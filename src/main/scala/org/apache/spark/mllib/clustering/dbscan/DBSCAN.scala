@@ -56,7 +56,7 @@ object DBSCAN {
         DBSCANPoint(Vectors.dense(arr),uid)
       }
     data.cache()
-    val model = train(data,0.1,20,2000)
+    val model = train(data,0.1,50,2000)
     textdata.unpersist()
     model.labeledPoints.sortBy(_.cluster).saveAsTextFile(args(1))
 
@@ -120,7 +120,7 @@ class DBSCAN private (
     // and count how many points are contained in each one of them
     val minimumRectanglesWithCount =
     points
-        .map(p=>DBSCANRectangle.toMinimumBoundingRectangle(p.vector,minimumRectangleSize))
+        .map(p=>DBSCANRectangle.toMinimumBoundingRectangle(p.vector,eps))
         .filter(!_.empty())
         .map((_, 1))
         .aggregateByKey(0)(_ + _, _ + _)
