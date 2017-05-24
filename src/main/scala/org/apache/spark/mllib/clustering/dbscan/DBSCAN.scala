@@ -111,7 +111,7 @@ class DBSCAN private (
     .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
 
   def labeledPoints: RDD[DBSCANLabeledPoint] = {
-    labeledPartitionedPoints.values
+    labeledPartitionedPoints.values.distinct()
   }
 
   private def train(points: RDD[DBSCANPoint]): DBSCAN = {
