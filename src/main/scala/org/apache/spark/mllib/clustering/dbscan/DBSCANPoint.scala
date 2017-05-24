@@ -16,17 +16,35 @@
  */
 package org.apache.spark.mllib.clustering.dbscan
 
-import org.apache.spark.mllib.linalg.Vector
+import org.apache.commons.math3.util.MathArrays
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 case class DBSCANPoint(val vector: Vector) {
 
-  def x = vector(0)
-  def y = vector(1)
+//    def x = vector(0)
+//
+//    def y = vector(1)
+
+  //  def distanceSquared(other: DBSCANPoint): Double = {
+  //    val dx = other.x - x
+  //    val dy = other.y - y
+  //    (dx * dx) + (dy * dy)
+  //  }
 
   def distanceSquared(other: DBSCANPoint): Double = {
-    val dx = other.x - x
-    val dy = other.y - y
-    (dx * dx) + (dy * dy)
+//    val product = vector.toArray.zip(other.vector.toArray).map { case (a, b) => a * b }.sum
+//    val v1 = vector.toArray.map(a => a * a).sum
+//    val v2 = other.vector.toArray.map(a => a * a).sum
+//    product / (Math.sqrt(v1) * Math.sqrt(v2))
+    MathArrays.distance(vector.toArray, other.vector.toArray)
+//    Math.sqrt(vector.toArray.zip(other.vector.toArray)
+//      .map { case (a, b) => Math.pow(a - b,2) }.sum)
   }
 
 }
+object DBSCANPoint1{
+  def main(args: Array[String]): Unit = {
+    println(MathArrays.distance(Array(0.1,0.0,0), Array(0.2,0.0,0.3)))
+  }
+}
+

@@ -35,8 +35,8 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
   def samplePoint = Array(new DBSCANLabeledPoint(Vectors.dense(Array(0D, 0D))))
 
   def fit(points: Iterable[DBSCANPoint]): Iterable[DBSCANLabeledPoint] = {
-
-    logInfo(s"About to start fitting")
+    val size = points.size
+    logInfo(s"About to start fitting,$size")
 
     val labeledPoints = points.map { new DBSCANLabeledPoint(_) }.toArray
 

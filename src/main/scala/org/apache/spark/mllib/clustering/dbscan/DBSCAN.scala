@@ -19,13 +19,50 @@ package org.apache.spark.mllib.clustering.dbscan
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
-import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 
 /**
  * Top level method for calling DBSCAN
  */
+case class Data(uid :Long,tag_id :String,weight :Double,cat_id :String)
+
 object DBSCAN {
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder().master("local[*]").getOrCreate()
+    val textdata = spark.sparkContext.wholeTextFiles(args(0),100)
+      .flatMap(_._2.split("\n").filter(!_.equals("")))
+      .map { line =>
+        val columns = line.split(' ')
+        val Array(uid, tag_id, weight, cat_id) = columns
+        Data(uid.toLong, tag_id, weight.toDouble, cat_id)
+      }.filter(data=>data.cat_id.equals("1042015:tagCategory_012"))
+      textdata.cache()
+//    val filterData = spark.createDataFrame(textdata).where("cat_id='1042015:tagCategory_012'")
+// val filterData = IOHelper.readData(sqlContext, argsParser.args.inputPath)
+// .where("cat_id='1042015:tagCategory_012'")
+    val distinctTag = textdata.map(data=>data.tag_id).distinct().collect()
+    val tagBd = spark.sparkContext.broadcast(distinctTag)
+
+    val data = textdata.map(data =>(data.uid,(data.tag_id,data.weight))).groupByKey()
+      .map{case (uid,iter) =>
+        val arr: Array[Double] = new Array[Double](tagBd.value.length)
+        iter.foreach { case (tag_id, weight) =>
+          arr(tagBd.value.indexOf(tag_id)) = BigDecimal(weight.asInstanceOf[Double]/100-0.5)
+            .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+        }
+//        (uid,arr)
+        Vectors.dense(arr)
+      }
+    data.cache()
+    val model = train(data,0.1,20,2000)
+    textdata.unpersist()
+//    model.labeledPoints.collect().foreach(println)
+    model.labeledPoints.sortBy(_.cluster).saveAsTextFile(args(1))
+
+    spark.stop()
+  }
 
   /**
    * Train a DBSCAN Model using the given set of parameters
@@ -71,7 +108,8 @@ class DBSCAN private (
   type Margins = (DBSCANRectangle, DBSCANRectangle, DBSCANRectangle)
   type ClusterId = (Int, Int)
 
-  def minimumRectangleSize = 2 * eps
+  def minimumRectangleSize = BigDecimal(eps * 2)
+    .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
 
   def labeledPoints: RDD[DBSCANLabeledPoint] = {
     labeledPartitionedPoints.values
@@ -83,36 +121,46 @@ class DBSCAN private (
     // and count how many points are contained in each one of them
     val minimumRectanglesWithCount =
       vectors
-        .map(toMinimumBoundingRectangle)
+        .map(DBSCANRectangle.toMinimumBoundingRectangle(_,minimumRectangleSize))
+        .filter(!_.empty())
         .map((_, 1))
         .aggregateByKey(0)(_ + _, _ + _)
         .collect()
         .toSet
 
-    // find the best partitions for the data space
-    val localPartitions = EvenSplitPartitioner
-      .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize)
 
+    // find the best partitions for the data space
+    var start = System.currentTimeMillis()
+//  每个分区面积及覆盖的点
+    val localPartitions = EvenSplitPartitioner
+      .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize,eps)
+
+    println(" partitions spend time :" + (System.currentTimeMillis()-start))
+    start = System.currentTimeMillis()
     logDebug("Found partitions: ")
     localPartitions.foreach(p => logDebug(p.toString))
 
     // grow partitions to include eps
     val localMargins =
       localPartitions
-        .map({ case (p, _) => (p.shrink(eps), p, p.shrink(-eps)) })
+        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
         .zipWithIndex
-
+    println(" localMargins spend time :" + (System.currentTimeMillis()-start))
     val margins = vectors.context.broadcast(localMargins)
 
     // assign each point to its proper partition
     val duplicated = for {
       point <- vectors.map(DBSCANPoint)
       ((inner, main, outer), id) <- margins.value
-      if outer.contains(point)
+      if main.contains(point)
     } yield (id, point)
 
-    val numOfPartitions = localPartitions.size
 
+    val numOfPartitions = localPartitions.size
+    val r = duplicated
+      .groupByKey(numOfPartitions)
+      .mapValues(_.size).collectAsMap()
+//  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =
       duplicated
@@ -122,6 +170,7 @@ class DBSCAN private (
         .cache()
 
     // find all candidate points for merging clusters and group them
+//    找出所有不inner和main之间的点，标记为多个分区内
     val mergePoints =
       clustered
         .flatMap({
@@ -138,6 +187,7 @@ class DBSCAN private (
 
     logDebug("About to find adjacencies")
     // find all clusters with aliases from merging candidates
+//    点及其邻接点
     val adjacencies =
       mergePoints
         .flatMapValues(findAdjacencies)
@@ -149,7 +199,7 @@ class DBSCAN private (
       case (graph, (from, to)) => graph.connect(from, to)
     }
 
-    logDebug("About to find all cluster ids")
+     logDebug("About to find all cluster ids")
     // find all cluster ids
     val localClusterIds =
       clustered
@@ -186,13 +236,13 @@ class DBSCAN private (
 
     logDebug("About to relabel inner points")
     // relabel non-duplicated points
-    val labeledInner =
-      clustered
+
+      val innerData = clustered
         .filter(isInnerPoint(_, margins.value))
-        .map {
+    val labeledInner =innerData.map {
           case (partition, point) => {
 
-            if (point.flag != Flag.Noise) {
+            if (point.flag != Flag.Noise&&clusterIds.value.contains((partition, point.cluster))) {
               point.cluster = clusterIds.value((partition, point.cluster))
             }
 
@@ -276,9 +326,9 @@ class DBSCAN private (
         if (point.flag == Flag.Noise) {
           (seen, adjacencies)
         } else {
-
+//        分区＋组
           val clusterId = (partition, point.cluster)
-
+//        此点和他的邻接点们
           seen.get(point) match {
             case None                => (seen + (point -> clusterId), adjacencies)
             case Some(prevClusterId) => (seen, adjacencies + ((prevClusterId, clusterId)))
@@ -290,17 +340,6 @@ class DBSCAN private (
     adjacencies
   }
 
-  private def toMinimumBoundingRectangle(vector: Vector): DBSCANRectangle = {
-    val point = DBSCANPoint(vector)
-    val x = corner(point.x)
-    val y = corner(point.y)
-    DBSCANRectangle(x, y, x + minimumRectangleSize, y + minimumRectangleSize)
-  }
 
-  private def corner(p: Double): Double =
-    (shiftIfNegative(p) / minimumRectangleSize).intValue * minimumRectangleSize
-
-  private def shiftIfNegative(p: Double): Double =
-    if (p < 0) p - minimumRectangleSize else p
 
 }
