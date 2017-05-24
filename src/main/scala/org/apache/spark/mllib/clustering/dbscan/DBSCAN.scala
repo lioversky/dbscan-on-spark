@@ -30,7 +30,7 @@ case class Data(uid :Long,tag_id :String,weight :Double,cat_id :String)
 
 object DBSCAN {
   def main(args: Array[String]): Unit = {
-    val spark = SparkSession.builder().master("local[*]").getOrCreate()
+    val spark = SparkSession.builder().getOrCreate()
     val textdata = spark.sparkContext.wholeTextFiles(args(0),100)
       .flatMap(_._2.split("\n").filter(!_.equals("")))
       .map { line =>
