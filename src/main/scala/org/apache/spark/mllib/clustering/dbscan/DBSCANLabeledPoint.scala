@@ -44,4 +44,9 @@ class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector
     s"$vector,$pointId,$cluster,$flag"
   }
 
+  override def equals(obj: scala.Any): Boolean = {
+    val other = obj.asInstanceOf[DBSCANLabeledPoint]
+    pointId == other.pointId
+  }
+
 }

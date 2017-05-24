@@ -67,18 +67,15 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
   }
 
-  private def findNeighbors(
-    point: DBSCANPoint,
-    all: Array[DBSCANLabeledPoint]): Iterable[DBSCANLabeledPoint] =
+  private def findNeighbors(point: DBSCANPoint,
+                             all: Array[DBSCANLabeledPoint]): Iterable[DBSCANLabeledPoint] =
     all.view.filter(other => {
-      point.distanceSquared(other) <= minDistanceSquared
+      point.pointId != other.pointId && point.distanceSquared(other) <= minDistanceSquared
     })
 
-  def expandCluster(
-    point: DBSCANLabeledPoint,
-    neighbors: Iterable[DBSCANLabeledPoint],
-    all: Array[DBSCANLabeledPoint],
-    cluster: Int): Unit = {
+  def expandCluster(point: DBSCANLabeledPoint, neighbors: Iterable[DBSCANLabeledPoint],
+                     all: Array[DBSCANLabeledPoint],
+                     cluster: Int): Unit = {
 
     point.flag = Flag.Core
     point.cluster = cluster
