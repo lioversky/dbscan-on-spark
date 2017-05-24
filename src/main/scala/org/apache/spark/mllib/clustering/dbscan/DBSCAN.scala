@@ -49,14 +49,35 @@ object DBSCAN {
       .map{case (uid,iter) =>
         val arr: Array[Double] = new Array[Double](tagBd.value.length)
         iter.foreach { case (tag_id, weight) =>
-          arr(tagBd.value.indexOf(tag_id)) = BigDecimal(weight.asInstanceOf[Double]/100-0.5)
+          arr(tagBd.value.indexOf(tag_id)) = BigDecimal(weight.asInstanceOf[Double])
             .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
         }
 //        (uid,arr)
         DBSCANPoint(Vectors.dense(arr),uid)
       }
     data.cache()
-    val model = train(data,0.1,50,2000)
+//    var zeroValue = Map[Int,scala.collection.mutable.Map[Int,Int]]()
+//
+//    for(i <- 1 to distinctTag.size){
+//      zeroValue = zeroValue + ((i-1) -> scala.collection.mutable.Map[Int,Int]())
+//    }
+//    data.map(_.vector.toArray).collect().foldLeft(zeroValue) { case (map, arr) =>
+//      arr.zipWithIndex.foreach { case (d, id) =>
+//        val value = (d / 5).toInt
+//        val countMap = map.get(id).get
+//
+//        countMap.get(value) match {
+//          case None => {
+//            countMap += (value -> 1)
+//          }
+//          case Some(c) => countMap(value) = c + 1
+//        }
+//      }
+//      map
+//    }.foreach(println)
+
+
+    val model = train(data,5,50,5000)
     textdata.unpersist()
     model.labeledPoints.sortBy(_.cluster).saveAsTextFile(args(1))
 
@@ -107,7 +128,7 @@ class DBSCAN private (
   type Margins = (DBSCANRectangle, DBSCANRectangle, DBSCANRectangle)
   type ClusterId = (Int, Int)
 
-  def minimumRectangleSize = BigDecimal(eps * 2)
+  def minimumRectangleSize = BigDecimal(eps )
     .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
 
   def labeledPoints: RDD[DBSCANLabeledPoint] = {
@@ -156,6 +177,10 @@ class DBSCAN private (
 
 
     val numOfPartitions = localPartitions.size
+    val r = duplicated
+      .groupByKey(numOfPartitions)
+      .mapValues(_.size).collectAsMap()
+    println(r)
 //  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =

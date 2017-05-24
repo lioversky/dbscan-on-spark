@@ -92,6 +92,7 @@ class EvenSplitPartitioner(
 
     remaining match {
       case (rectangle, count) :: rest =>
+        logInfo(s"$count will be split")
         if (count > maxPointsPerPartition) {
           val countSet = pointsInRectangleMap.get(rectangle).get
           //        如果区域可以再拆分
@@ -117,7 +118,8 @@ class EvenSplitPartitioner(
           }
 
         } else {
-          partition(rest, (splitEmptyRectangle(rectangle,pointsInRectangleMap.get(rectangle).get), count) :: partitioned)
+//          partition(rest, (splitEmptyRectangle(rectangle,pointsInRectangleMap.get(rectangle).get), count) :: partitioned)
+          partition(rest, (rectangle, count) :: partitioned)
         }
 
       case Nil => partitioned
@@ -190,15 +192,47 @@ class EvenSplitPartitioner(
     */
   private def findPossibleSplits(box: DBSCANRectangle): Set[DBSCANRectangle] = {
 
-    val (_, id) = box.array.zipWithIndex.map({ case ((x, x1), id) => (x1 - x, id) }).maxBy(_._1)
+    /*
+    val canSplit = box.array.zipWithIndex.filter { case (x, x1) => x._2 - x._1 > minimumRectangleSize }
+      .map { case ((x, x1), id) =>
+        ((x + eps until x1 by eps), id)
+      }
+      canSplit(0)._1.flatMap(d => {
+        var list: List[DBSCANRectangle] = List()
+        val clone = box.array.clone()
+        clone(canSplit(1)._2) = (clone(canSplit(1)._2)._1, BigDecimal(d)
+          .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
+        if (canSplit.size == 1) list = DBSCANRectangle(clone) :: list
+        else {
+          for (i <- 1 to canSplit.length - 1) {
+            canSplit(i)._1.map(dd => {
+              val arr = clone.clone()
+              arr(canSplit(i)._2) = (arr(canSplit(i)._2)._1, BigDecimal(dd)
+                .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
+              list = DBSCANRectangle(arr) :: list
+            })
+          }
+        }
+        list
+      })
+      .toSet
+      */
 
-    (box.array(id)._1 + eps until box.array(id)._2 by eps)
+
+    val canSplit = box.array.zipWithIndex.map({ case ((x, x1), id) => (x1 - x, id) })
+      .sortWith(_._1>_._1)
+
+    canSplit.take(canSplit.size/2).flatMap { case (_, id) =>
+
+      (box.array(id)._1 + eps until box.array(id)._2 by eps
+      )
       .map { d =>
         val array = box.array.clone()
         array(id) = (array(id)._1, BigDecimal(d)
           .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
         DBSCANRectangle(array)
-      }.toSet
+      }
+    }.toSet
 
     /*
     box.array.map { case (x, y) => {
