@@ -30,6 +30,10 @@ case class DBSCANPoint(val vector: Vector,pointId:Long) {
   //    val dy = other.y - y
   //    (dx * dx) + (dy * dy)
   //  }
+  override def toString(): String = {
+    val vectorStr = vector.toArray.mkString(",")
+    s"$vectorStr,$pointId"
+  }
 
   def distanceSquared(other: DBSCANPoint): Double = {
 //    val product = vector.toArray.zip(other.vector.toArray).map { case (a, b) => a * b }.sum

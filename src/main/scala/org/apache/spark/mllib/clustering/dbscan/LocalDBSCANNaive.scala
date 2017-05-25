@@ -94,7 +94,7 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
           if (neighborNeighbors.size >= minPoints) {
             neighbor.flag = Flag.Core
-            allNeighbors.enqueue(neighborNeighbors)
+//            allNeighbors.enqueue(neighborNeighbors)
           } else {
             neighbor.flag = Flag.Border
           }
