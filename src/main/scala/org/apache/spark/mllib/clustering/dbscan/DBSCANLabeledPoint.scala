@@ -29,7 +29,6 @@ object DBSCANLabeledPoint {
     type Flag = Value
     val Border, Core, Noise, NotFlagged = Value
   }
-
 }
 
 class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector,pointId:Long) {
@@ -49,5 +48,10 @@ class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector
     val other = obj.asInstanceOf[DBSCANLabeledPoint]
     pointId == other.pointId
   }
+
+  override def hashCode(): Int = {
+    pointId.toInt
+  }
+
 
 }

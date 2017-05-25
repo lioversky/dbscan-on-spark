@@ -92,14 +92,14 @@ class EvenSplitPartitioner(
 
     remaining match {
       case (rectangle, count) :: rest =>
-        logInfo(s"$count will be split")
+        logWarning(s"$count will be split")
         if (count > maxPointsPerPartition) {
           val countSet = pointsInRectangleMap.get(rectangle).get
           //        如果区域可以再拆分
           if (canBeSplit(rectangle)) {
             logTrace(s"About to split: $rectangle")
             //          r包含的点与当前要拆分（即最大区域）包含点一半的差值
-            def cost = (r: DBSCANRectangle) => ((pointsIn(toSplit,rectangle) / 2) - pointsIn(countSet,r)).abs
+            def cost = (r: DBSCANRectangle) => (count/2 - pointsIn(countSet,r)).abs
             val (split1, split2) = verticalSplit(rectangle, cost)
             logTrace(s"Found split: $split1, $split2")
             val s1 = (split1, pointsIn(countSet,split1))

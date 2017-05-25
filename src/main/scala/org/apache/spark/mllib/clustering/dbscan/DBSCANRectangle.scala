@@ -44,7 +44,7 @@ case class DBSCANRectangle(val array: Array[(Double, Double)]) {
   def contains(point: DBSCANPoint): Boolean = {
     var flag = true
     for (((x1, y1), x) <- array.zip(point.vector.toArray) if flag) {
-      if (x != 0 && (x1 > x || y1 <= x)) flag = false
+      if ( (x1 > x || y1 <= x)) flag = false
     }
     flag
 
@@ -98,6 +98,10 @@ case class DBSCANRectangle(val array: Array[(Double, Double)]) {
 
   def length(): Double = {
     array.map { case (x, x1) => x1 - x }.sum
+  }
+
+  override def toString: String = {
+    array.mkString(",")
   }
 }
 
