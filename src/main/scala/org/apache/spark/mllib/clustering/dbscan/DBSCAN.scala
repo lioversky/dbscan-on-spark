@@ -119,10 +119,6 @@ class DBSCAN private (
 
 
     val numOfPartitions = localPartitions.size
-    val r = duplicated
-      .groupByKey(numOfPartitions)
-      .mapValues(_.size).collectAsMap()
-    println(r)
 //  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =
