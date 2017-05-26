@@ -17,72 +17,15 @@
 package org.apache.spark.mllib.clustering.dbscan
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
 
 /**
  * Top level method for calling DBSCAN
  */
-case class Data(uid :Long,tag_id :String,weight :Double,cat_id :String)
 
 object DBSCAN {
-  def main(args: Array[String]): Unit = {
-    val spark = SparkSession.builder().getOrCreate()
-    val textdata = spark.sparkContext.wholeTextFiles(args(0),100)
-      .flatMap(_._2.split("\n").filter(!_.equals("")))
-      .map { line =>
-        val columns = line.split(' ')
-        val Array(uid, tag_id, weight, cat_id) = columns
-        Data(uid.toLong, tag_id, weight.toDouble, cat_id)
-      }.filter(data=>data.cat_id.equals("1042015:tagCategory_012"))
-      textdata.cache()
-//    val filterData = spark.createDataFrame(textdata).where("cat_id='1042015:tagCategory_012'")
-// val filterData = IOHelper.readData(sqlContext, argsParser.args.inputPath)
-// .where("cat_id='1042015:tagCategory_012'")
-    val distinctTag = textdata.map(data=>data.tag_id).distinct().collect()
-    val tagBd = spark.sparkContext.broadcast(distinctTag)
-
-    val data = textdata.map(data =>(data.uid,(data.tag_id,data.weight))).groupByKey()
-      .map{case (uid,iter) =>
-        val arr: Array[Double] = new Array[Double](tagBd.value.length)
-        iter.foreach { case (tag_id, weight) =>
-          arr(tagBd.value.indexOf(tag_id)) = BigDecimal(weight.asInstanceOf[Double])
-            .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
-        }
-//        (uid,arr)
-        DBSCANPoint(Vectors.dense(arr),uid)
-      }
-    data.cache()
-//    var zeroValue = Map[Int,scala.collection.mutable.Map[Int,Int]]()
-//
-//    for(i <- 1 to distinctTag.size){
-//      zeroValue = zeroValue + ((i-1) -> scala.collection.mutable.Map[Int,Int]())
-//    }
-//    data.map(_.vector.toArray).collect().foldLeft(zeroValue) { case (map, arr) =>
-//      arr.zipWithIndex.foreach { case (d, id) =>
-//        val value = (d / 5).toInt
-//        val countMap = map.get(id).get
-//
-//        countMap.get(value) match {
-//          case None => {
-//            countMap += (value -> 1)
-//          }
-//          case Some(c) => countMap(value) = c + 1
-//        }
-//      }
-//      map
-//    }.foreach(println)
-
-
-    val model = train(data,5,50,5000)
-    textdata.unpersist()
-    model.labeledPoints.sortBy(_.cluster).saveAsTextFile(args(1))
-
-    spark.stop()
-  }
 
   /**
    * Train a DBSCAN Model using the given set of parameters
@@ -99,9 +42,7 @@ object DBSCAN {
     eps: Double,
     minPoints: Int,
     maxPointsPerPartition: Int): DBSCAN = {
-
     new DBSCAN(eps, minPoints, maxPointsPerPartition, null, null).train(data)
-
   }
 
 }
@@ -150,29 +91,30 @@ class DBSCAN private (
 
 
     // find the best partitions for the data space
-    var start = System.currentTimeMillis()
+    val start = System.currentTimeMillis()
 //  每个分区面积及覆盖的点
     val localPartitions = EvenSplitPartitioner
       .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize,eps)
 
     println(" partitions spend time :" + (System.currentTimeMillis()-start))
-    start = System.currentTimeMillis()
     logDebug("Found partitions: ")
-    localPartitions.foreach(p => logDebug(p.toString))
+    localPartitions.foreach(p => logWarning(p.toString))
 
     // grow partitions to include eps
     val localMargins =
       localPartitions
         .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
         .zipWithIndex
-    println(" localMargins spend time :" + (System.currentTimeMillis()-start))
+    localMargins.foreach(u=>{
+      println(u._1._2 + "---" + u._2)
+    })
     val margins = points.context.broadcast(localMargins)
 
     // assign each point to its proper partition
     val duplicated = for {
       point <- points
       ((inner, main, outer), id) <- margins.value
-      if main.contains(point)
+      if outer.contains(point)
     } yield (id, point)
 
 
