@@ -218,21 +218,15 @@ class EvenSplitPartitioner(
       .toSet
       */
 
+    val (_, id) = box.array.zipWithIndex.map({ case ((x, x1), id) => (x1 - x, id) }).maxBy(_._1)
 
-    val canSplit = box.array.zipWithIndex.map({ case ((x, x1), id) => (x1 - x, id) })
-      .sortWith(_._1>_._1)
-
-    canSplit.take(canSplit.size/2).flatMap { case (_, id) =>
-
-      (box.array(id)._1 + eps until box.array(id)._2 by eps
-      )
+    (box.array(id)._1 + eps until box.array(id)._2 by eps)
       .map { d =>
         val array = box.array.clone()
         array(id) = (array(id)._1, BigDecimal(d)
           .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
         DBSCANRectangle(array)
-      }
-    }.toSet
+      }.toSet
 
     /*
     box.array.map { case (x, y) => {
