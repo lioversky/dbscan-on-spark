@@ -16,11 +16,10 @@
  */
 package org.apache.spark.mllib.clustering.dbscan
 
-import scala.collection.mutable.Queue
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
-import org.apache.spark.mllib.linalg.Vectors
+
+import scala.collection.mutable.Queue
 
 /**
  * A naive implementation of DBSCAN. It has O(n2) complexity
@@ -83,7 +82,7 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
     var allNeighbors = Queue(neighbors)
 
     while (allNeighbors.nonEmpty) {
-
+      val neighborSet = scala.collection.mutable.Set[DBSCANLabeledPoint]()
       allNeighbors.dequeue().foreach(neighbor => {
         if (!neighbor.visited) {
 
@@ -94,7 +93,8 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
           if (neighborNeighbors.size >= minPoints) {
             neighbor.flag = Flag.Core
-            allNeighbors.enqueue(neighborNeighbors.filter(!_.visited))
+//            allNeighbors.enqueue(neighborNeighbors.filter(!_.visited))
+            neighborNeighbors.filter(!_.visited).foreach(neighborSet.add)
           } else {
             neighbor.flag = Flag.Border
           }
@@ -108,7 +108,7 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
         }
 
       })
-
+      if(neighborSet.nonEmpty) allNeighbors.enqueue(neighborSet)
     }
 
   }
