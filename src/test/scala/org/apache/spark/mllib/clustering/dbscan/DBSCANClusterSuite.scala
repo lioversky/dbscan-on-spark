@@ -16,32 +16,36 @@
  */
 package org.apache.spark.mllib.clustering.dbscan
 
-import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.util.MLlibTestSparkContext
+import org.scalatest.{FunSuite, Matchers}
 
 /**
- * Companion constants for labeled points
- */
-object DBSCANLabeledPoint {
+  * Created by hongxun on 17/5/29.
+  */
+class DBSCANClusterSuite extends FunSuite with MLlibTestSparkContext with Matchers {
+  test("should cluster") {
+    val input = Seq(
+      (0.9, 1.0),
+      (1.0, 1.0),
+      (1.0, 1.1),
+      (5.0, 5.0), // NOISE
 
-  val Unknown = 0
+      (15.0, 15.0),
+      (15.0, 14.1),
+      (15.3, 15.0)
+    )
 
-  object Flag extends Enumeration {
-    type Flag = Value
-    val Border, Core, Noise, NotFlagged = Value
+    val inputData = spark.sparkContext
+      .parallelize(input
+        .map(t => Array(t._1, t._2))
+        .zipWithIndex
+        .map(b => DBSCANPoint(Vectors.dense(b._1), b._2)))
+
+    val model = DBSCAN.train(inputData, 1, 2, 5)
+
+    val clusters = model.getClusters().collect()
+
+    3 should equal(clusters.length)
   }
-}
-
-class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector,pointId:Long) {
-
-  def this(point: DBSCANPoint) = this(point.vector,point.pointId)
-
-  var flag = DBSCANLabeledPoint.Flag.NotFlagged
-  var cluster = DBSCANLabeledPoint.Unknown
-  var visited = false
-
-  override def toString(): String = {
-    s"$vector,$pointId,$cluster,$flag"
-  }
-
-
 }

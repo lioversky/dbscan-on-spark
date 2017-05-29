@@ -14,34 +14,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.mllib.clustering.dbscan
 
-import org.apache.spark.mllib.linalg.Vector
+package org.apache.spark.mllib.util
 
-/**
- * Companion constants for labeled points
- */
-object DBSCANLabeledPoint {
+import org.apache.spark.sql.SparkSession
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-  val Unknown = 0
+trait MLlibTestSparkContext extends BeforeAndAfterAll { self: Suite =>
+  @transient var spark: SparkSession = _
 
-  object Flag extends Enumeration {
-    type Flag = Value
-    val Border, Core, Noise, NotFlagged = Value
-  }
-}
+  override def beforeAll() {
+    super.beforeAll()
+    spark = SparkSession
+      .builder()
+      .master("local[*]")
+      .appName("MLlibUnitTest")
+      .getOrCreate()
 
-class DBSCANLabeledPoint(vector: Vector,pointId:Long) extends DBSCANPoint(vector,pointId:Long) {
-
-  def this(point: DBSCANPoint) = this(point.vector,point.pointId)
-
-  var flag = DBSCANLabeledPoint.Flag.NotFlagged
-  var cluster = DBSCANLabeledPoint.Unknown
-  var visited = false
-
-  override def toString(): String = {
-    s"$vector,$pointId,$cluster,$flag"
   }
 
-
+  override def afterAll() {
+    if (spark != null) {
+      spark.stop()
+    }
+    super.afterAll()
+  }
 }

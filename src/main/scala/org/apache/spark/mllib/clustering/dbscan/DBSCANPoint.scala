@@ -21,18 +21,15 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 case class DBSCANPoint(val vector: Vector,pointId:Long) {
 
-//    def x = vector(0)
-//
-//    def y = vector(1)
 
-  //  def distanceSquared(other: DBSCANPoint): Double = {
-  //    val dx = other.x - x
-  //    val dy = other.y - y
-  //    (dx * dx) + (dy * dy)
-  //  }
-  override def toString(): String = {
-    val vectorStr = vector.toArray.mkString(",")
-    s"$vectorStr,$pointId"
+  override def equals(obj: scala.Any): Boolean = {
+    if(obj==null) return false
+    val other = obj.asInstanceOf[DBSCANPoint]
+    pointId == other.pointId
+  }
+
+  override def hashCode(): Int = {
+    pointId.toInt
   }
 
   def distanceSquared(other: DBSCANPoint): Double = {
@@ -43,6 +40,11 @@ case class DBSCANPoint(val vector: Vector,pointId:Long) {
     MathArrays.distance(vector.toArray, other.vector.toArray)
 //    Math.sqrt(vector.toArray.zip(other.vector.toArray)
 //      .map { case (a, b) => Math.pow(a - b,2) }.sum)
+
+//    vector.toArray.zip(other.vector.toArray).map{case(x1,x2)=>
+//      (x2-x1)*(x2-x1)
+//      Math.pow(x2-x1,2)
+//    }.sum
   }
 
 }

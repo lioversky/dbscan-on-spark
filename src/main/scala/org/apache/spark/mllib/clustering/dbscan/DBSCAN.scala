@@ -18,7 +18,7 @@ package org.apache.spark.mllib.clustering.dbscan
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
-import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 
 /**
@@ -103,7 +103,7 @@ class DBSCAN private (
     // grow partitions to include eps
     val localMargins =
       localPartitions
-        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
+        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps)) })
         .zipWithIndex
     localMargins.foreach(u=>{
       println(u._1._2 + "---" + u._2)
@@ -122,7 +122,7 @@ class DBSCAN private (
     val r = duplicated
       .groupByKey(numOfPartitions)
       .mapValues(_.size).collect
-    println(r.sortWith(_._2>_._2))
+    println(r.sortWith(_._2>_._2).mkString(","))
 //  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =
@@ -262,6 +262,41 @@ class DBSCAN private (
   def predict(vector: Vector): DBSCANLabeledPoint = {
     throw new NotImplementedError
   }
+
+  def predict(point:DBSCANPoint): DBSCANLabeledPoint = {
+    predict(point.vector)
+  }
+
+  /**
+    * 获取所有非噪音的分组信息
+    * @return
+    */
+  def getClusters(): RDD[DBSCANCluster] = {
+
+    labeledPartitionedPoints
+        .map{case (_,point) =>(point.cluster,point)}
+      .groupByKey()
+      .map { case (gid, iter) =>
+        val array = new Array[(Double, Double)](iter.head.vector.size)
+
+        val invertedRectangle =
+          DBSCANRectangle(array.map(_ => (Double.MaxValue, Double.MinValue)))
+        //      找到每维边界值
+        val center = iter.foldLeft(invertedRectangle) {
+          case (bounding, point) =>
+            DBSCANRectangle(
+              bounding.array.zip(point.vector.toArray).map { case ((x, y), x1) =>
+                (x.min(x1), y.max(x1))
+              })
+        }
+          //      取中位数
+          .array.map { case (x, x1) => x + (x1 - x) / 2 }
+
+        new DBSCANCluster(gid, iter.size, Vectors.dense(center))
+      }
+  }
+
+
 
   private def isInnerPoint(
     entry: (Int, DBSCANLabeledPoint),

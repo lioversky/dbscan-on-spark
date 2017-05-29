@@ -18,6 +18,7 @@ package org.apache.spark.mllib.clustering.dbscan
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
+import org.apache.spark.mllib.linalg.Vectors
 
 import scala.collection.mutable.Queue
 
@@ -29,7 +30,7 @@ import scala.collection.mutable.Queue
  */
 class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
-  val minDistanceSquared = eps * eps
+  val minDistanceSquared = eps
 
 //  def samplePoint = Array(new DBSCANLabeledPoint(Vectors.dense(Array(0D, 0D))))
 
@@ -66,10 +67,25 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
   }
 
-  private def findNeighbors(point: DBSCANPoint,
-                             all: Array[DBSCANLabeledPoint]): Iterable[DBSCANLabeledPoint] =
+  /**
+    * 计算给定点的所有Neighbors
+    * 计算点不能为当前点，
+    *   且计算点未分类或者 分类且与当前点同簇，
+    *   且距离小于minDistanceSquared
+    * 直接返回true
+    * @param point　当前点
+    * @param all　所有计算点
+    * @return　所有Neighbors
+    */
+  private def findNeighbors(point: DBSCANLabeledPoint,
+                            all: Array[DBSCANLabeledPoint]): Iterable[DBSCANLabeledPoint] =
     all.view.filter(other => {
-      point.pointId != other.pointId && point.distanceSquared(other) <= minDistanceSquared
+      point.pointId != other.pointId &&
+        (
+          (!other.visited || (other.visited && other.cluster == point.cluster))
+            &&
+            point.distanceSquared(other) <= minDistanceSquared
+          )
     })
 
   def expandCluster(point: DBSCANLabeledPoint, neighbors: Iterable[DBSCANLabeledPoint],
@@ -82,7 +98,7 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
     var allNeighbors = Queue(neighbors)
 
     while (allNeighbors.nonEmpty) {
-      val neighborSet = scala.collection.mutable.Set[DBSCANLabeledPoint]()
+      var neighborSet = scala.collection.mutable.Set[DBSCANLabeledPoint]()
       allNeighbors.dequeue().foreach(neighbor => {
         if (!neighbor.visited) {
 
@@ -94,7 +110,8 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
           if (neighborNeighbors.size >= minPoints) {
             neighbor.flag = Flag.Core
 //            allNeighbors.enqueue(neighborNeighbors.filter(!_.visited))
-            neighborNeighbors.filter(!_.visited).foreach(neighborSet.add)
+//            neighborNeighbors.filter(!_.visited).foreach(neighborSet.add)
+            neighborSet = neighborSet ++ neighborNeighbors
           } else {
             neighbor.flag = Flag.Border
           }
@@ -104,7 +121,10 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
             neighbor.flag = Flag.Border
           }
         }else {
-          if(neighbor.flag == Flag.Noise) neighbor.flag = Flag.Border
+          if(neighbor.flag == Flag.Noise) {
+            neighbor.cluster = cluster
+            neighbor.flag = Flag.Border
+          }
         }
 
       })
