@@ -31,7 +31,7 @@ import scala.collection.mutable.Queue
 class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 
   val minDistanceSquared = eps
-
+//  var allPoints = scala.collection.mutable.ListBuffer[DBSCANLabeledPoint]()
 //  def samplePoint = Array(new DBSCANLabeledPoint(Vectors.dense(Array(0D, 0D))))
 
   def fit(points: Iterable[DBSCANPoint]): Iterable[DBSCANLabeledPoint] = {
@@ -70,9 +70,10 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
   /**
     * 计算给定点的所有Neighbors
     * 计算点不能为当前点，
-    *   且计算点未分类或者 分类且与当前点同簇，
+    *   且计算点未分类或者 当前点未分类　或者都分过类后且同簇，
     *   且距离小于minDistanceSquared
-    * 直接返回true
+    * 不满足三个条件之一则直接返回false
+    * 满足返回true
     * @param point　当前点
     * @param all　所有计算点
     * @return　所有Neighbors
@@ -81,11 +82,11 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
                             all: Array[DBSCANLabeledPoint]): Iterable[DBSCANLabeledPoint] =
     all.view.filter(other => {
       point.pointId != other.pointId &&
-        (
-          (!other.visited || (other.visited && other.cluster == point.cluster))
-            &&
-            point.distanceSquared(other) <= minDistanceSquared
-          )
+        (!other.visited
+          || point.cluster ==DBSCANLabeledPoint.Unknown
+          || point.cluster != DBSCANLabeledPoint.Unknown&& other.cluster == point.cluster
+          ) &&
+        point.distanceSquared(other) <= minDistanceSquared
     })
 
   def expandCluster(point: DBSCANLabeledPoint, neighbors: Iterable[DBSCANLabeledPoint],
@@ -113,11 +114,6 @@ class LocalDBSCANNaive(eps: Double, minPoints: Int) extends Logging {
 //            neighborNeighbors.filter(!_.visited).foreach(neighborSet.add)
             neighborSet = neighborSet ++ neighborNeighbors
           } else {
-            neighbor.flag = Flag.Border
-          }
-
-          if (neighbor.cluster == DBSCANLabeledPoint.Unknown) {
-            neighbor.cluster = cluster
             neighbor.flag = Flag.Border
           }
         }else {
