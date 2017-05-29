@@ -103,7 +103,7 @@ class DBSCAN private (
     // grow partitions to include eps
     val localMargins =
       localPartitions
-        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps)) })
+        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
         .zipWithIndex
     localMargins.foreach(u=>{
       println(u._1._2 + "---" + u._2)
