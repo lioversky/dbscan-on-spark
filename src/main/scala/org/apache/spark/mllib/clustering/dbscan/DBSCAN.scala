@@ -269,8 +269,6 @@ class DBSCAN private (
     predict(point.vector)
   }
 
-  def reClusteringNosie()
-
   /**
     * 获取所有非噪音的分组信息
     * @return
