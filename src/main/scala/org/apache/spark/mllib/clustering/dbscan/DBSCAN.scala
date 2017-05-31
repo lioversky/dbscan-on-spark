@@ -257,26 +257,40 @@ class DBSCAN private (
   }
 
   /**
-   * Find the appropriate label to the given `vector`
-   *
-   * This method is not yet implemented
-   */
-  def predict(vector: Vector): DBSCANLabeledPoint = {
-    throw new NotImplementedError
+    * 找到点最有可能属于哪个簇
+    * 在各分组的边界内的点才认为可以再分配的点
+    * Find the appropriate label to the given `point`
+    * @param point
+    * @return
+    */
+  def predict(point: DBSCANPoint): DBSCANLabeledPoint = {
+    val clusters = getClusters().filter(_.boundingContails(point.vector)).map(_.clusterId).collect()
+    val bdClusters = clusterPoints.sparkContext.broadcast(clusters)
+    val clusterMap = clusterPoints
+      .filter(p => bdClusters.value.contains(p.cluster) && p.flag.eq(Flag.Core) && p.distanceSquared(point) <= eps)
+      .map(p => (p.cluster, p))
+      .countByKey()
+
+    if (clusterMap.size > 0) {
+      val lp = new DBSCANLabeledPoint(point)
+      lp.cluster = clusterMap.toArray.maxBy(_._2)._1
+      lp.flag = Flag.Border
+      lp
+    }
+    else new DBSCANLabeledPoint(point)
   }
 
-  def predict(point:DBSCANPoint): DBSCANLabeledPoint = {
-    predict(point.vector)
-  }
+  def noisePoints = labeledPoints.filter ( _.cluster == DBSCANLabeledPoint.Unknown )
 
+  def clusterPoints = labeledPoints.filter ( _.cluster != DBSCANLabeledPoint.Unknown )
   /**
     * 获取所有非噪音的分组信息
     * @return
     */
   def getClusters(): RDD[DBSCANCluster] = {
 
-    labeledPartitionedPoints
-        .map{case (_,point) =>(point.cluster,point)}
+    clusterPoints
+      .map { case point => (point.cluster, point) }
       .groupByKey()
       .map { case (gid, iter) =>
         val array = new Array[(Double, Double)](iter.head.vector.size)
@@ -284,17 +298,19 @@ class DBSCAN private (
         val invertedRectangle =
           DBSCANRectangle(array.map(_ => (Double.MaxValue, Double.MinValue)))
         //      找到每维边界值
-        val center = iter.foldLeft(invertedRectangle) {
+        val bounding = iter.foldLeft(invertedRectangle) {
           case (bounding, point) =>
             DBSCANRectangle(
               bounding.array.zip(point.vector.toArray).map { case ((x, y), x1) =>
                 (x.min(x1), y.max(x1))
               })
         }
-          //      取中位数
-          .array.map { case (x, x1) => x + (x1 - x) / 2 }
+        val low = bounding.array.map(_._1)
+        val high = bounding.array.map(_._2)
+        //      取中位数
+        //
 
-        new DBSCANCluster(gid, iter.size, Vectors.dense(center))
+        new DBSCANCluster(gid, iter.size, Vectors.dense(low), Vectors.dense(high))
       }
   }
 
