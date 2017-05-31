@@ -41,8 +41,9 @@ object DBSCAN {
     data: RDD[DBSCANPoint],
     eps: Double,
     minPoints: Int,
-    maxPointsPerPartition: Int): DBSCAN = {
-    new DBSCAN(eps, minPoints, maxPointsPerPartition, null, null).train(data)
+    maxPointsPerPartition: Int,
+    outDuplicate :Double = 0.5): DBSCAN = {
+    new DBSCAN(eps, minPoints, maxPointsPerPartition, null, null, outDuplicate).train(data)
   }
 
 }
@@ -62,7 +63,8 @@ class DBSCAN private (
   val minPoints: Int,
   val maxPointsPerPartition: Int,
   @transient val partitions: List[(Int, DBSCANRectangle)],
-  @transient private val labeledPartitionedPoints: RDD[(Int, DBSCANLabeledPoint)])
+  @transient private val labeledPartitionedPoints: RDD[(Int, DBSCANLabeledPoint)],
+  val outDuplicate :Double = 0.5)
 
   extends Serializable with Logging {
 
@@ -103,7 +105,7 @@ class DBSCAN private (
     // grow partitions to include eps
     val localMargins =
       localPartitions
-        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps/2)) })
+        .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps * outDuplicate)) })
         .zipWithIndex
     localMargins.foreach(u=>{
       println(u._1._2 + "---" + u._2)
@@ -266,6 +268,8 @@ class DBSCAN private (
   def predict(point:DBSCANPoint): DBSCANLabeledPoint = {
     predict(point.vector)
   }
+
+  def reClusteringNosie()
 
   /**
     * 获取所有非噪音的分组信息
