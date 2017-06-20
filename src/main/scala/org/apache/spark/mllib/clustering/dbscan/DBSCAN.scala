@@ -64,15 +64,16 @@ class DBSCAN private (
   val maxPointsPerPartition: Int,
   @transient val partitions: List[(Int, DBSCANRectangle)],
   @transient private val labeledPartitionedPoints: RDD[(Int, DBSCANLabeledPoint)],
-  val outDuplicate :Double = 0.5)
+  val outDuplicate :Double = 0.5,
+  val minimumRectangleLength:Double = -1)
 
   extends Serializable with Logging {
 
   type Margins = (DBSCANRectangle, DBSCANRectangle, DBSCANRectangle)
   type ClusterId = (Int, Int)
 
-  def minimumRectangleSize = BigDecimal(eps )
-    .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+  def minimumRectangleSize = if (minimumRectangleLength < 0) BigDecimal(eps * 2)
+    .setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble else minimumRectangleLength
 
   def labeledPoints: RDD[DBSCANLabeledPoint] = {
     labeledPartitionedPoints.values.distinct()
@@ -96,7 +97,7 @@ class DBSCAN private (
     val start = System.currentTimeMillis()
 //  每个分区面积及覆盖的点
     val localPartitions = EvenSplitPartitioner
-      .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize,eps)
+      .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize)
 
     println(" partitions spend time :" + (System.currentTimeMillis()-start))
     logDebug("Found partitions: ")
@@ -107,9 +108,9 @@ class DBSCAN private (
       localPartitions
         .map({ case (p, _) => (p.shrink(eps/2), p, p.shrink(-eps * outDuplicate)) })
         .zipWithIndex
-    localMargins.foreach(u=>{
-      println(u._1._2 + "---" + u._2)
-    })
+//    localMargins.foreach(u=>{
+//      println(u._1._2 + "---" + u._2)
+//    })
     val margins = points.context.broadcast(localMargins)
 
     // assign each point to its proper partition
@@ -121,10 +122,10 @@ class DBSCAN private (
 
 
     val numOfPartitions = localPartitions.size
-    val r = duplicated
-      .groupByKey(numOfPartitions)
-      .mapValues(_.size).collect
-    println(r.sortWith(_._2>_._2).mkString(","))
+//    val r = duplicated
+//      .groupByKey(numOfPartitions)
+//      .mapValues(_.size).collect
+//    println(r.sortWith(_._2>_._2).mkString(","))
 //  通过loca dbscan将partition下初始聚合
     // perform local dbscan
     val clustered =

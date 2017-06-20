@@ -23,6 +23,7 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
   */
 case class DBSCANRectangle(val array: Array[(Double, Double)]) {
 
+  val sum = array.map { case (a, b) => b - a }.sum
   /**
     * Returns whether other is contained by this box
     */
@@ -44,7 +45,7 @@ case class DBSCANRectangle(val array: Array[(Double, Double)]) {
   def contains(point: DBSCANPoint): Boolean = {
     var flag = true
     for (((x1, y1), x) <- array.zip(point.vector.toArray) if flag) {
-      if ( (x1 > x || y1 <= x)) flag = false
+      if ( (x1 > x || y1 < x)) flag = false
     }
     flag
 
@@ -80,6 +81,7 @@ case class DBSCANRectangle(val array: Array[(Double, Double)]) {
     if (obj == null) false
     else {
       val other = obj.asInstanceOf[DBSCANRectangle]
+      if (sum != other.sum) return false
       var flag = true
       for ((a, b) <- array.zip(other.array) if flag) {
         if (a._1 != b._1 || a._2 != b._2) flag = false
@@ -109,8 +111,7 @@ object DBSCANRectangle {
   def main(args: Array[String]): Unit = {
 //    val d1 = DBSCANRectangle(Array((1.0, 2.0)))
 //    println(d1.equals(DBSCANRectangle(Array((1.0, 2.0)))))
-  val split = (0 ) to 11 by 2
-    split.foreach(println)
+
   }
 
   //  包含点的多维空间

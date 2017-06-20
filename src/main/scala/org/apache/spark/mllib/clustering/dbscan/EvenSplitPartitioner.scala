@@ -28,9 +28,8 @@ object EvenSplitPartitioner {
   def partition(
                  toSplit: Set[(DBSCANRectangle, Int)],
                  maxPointsPerPartition: Long,
-                 minimumRectangleSize: Double,
-                 eps:Double): List[(DBSCANRectangle, Int)] = {
-    new EvenSplitPartitioner(maxPointsPerPartition, minimumRectangleSize,eps,toSplit)
+                 minimumRectangleSize: Double): List[(DBSCANRectangle, Int)] = {
+    new EvenSplitPartitioner(maxPointsPerPartition, minimumRectangleSize,toSplit)
       .findPartitions()
   }
 
@@ -39,7 +38,6 @@ object EvenSplitPartitioner {
 class EvenSplitPartitioner(
                             maxPointsPerPartition: Long,
                             minimumRectangleSize: Double,
-                            eps:Double,
                             toSplit: Set[(DBSCANRectangle, Int)]) extends Logging {
 
   type RectangleWithCount = (DBSCANRectangle, Int)
@@ -220,7 +218,7 @@ class EvenSplitPartitioner(
 
     val (_, id) = box.array.zipWithIndex.map({ case ((x, x1), id) => (x1 - x, id) }).maxBy(_._1)
 
-    (box.array(id)._1 + eps until box.array(id)._2 by eps)
+    (box.array(id)._1 + minimumRectangleSize until box.array(id)._2 by minimumRectangleSize)
       .map { d =>
         val array = box.array.clone()
         array(id) = (array(id)._1, BigDecimal(d)
@@ -308,7 +306,7 @@ class EvenSplitPartitioner(
     if(count==0) return box
     val result = if (canBeSplit(box)) {
       val splits = box.array.map { case (x, y) => {
-        val split = (x + eps) until y by eps
+        val split = (x + minimumRectangleSize) until y by minimumRectangleSize
         split
       }
       }.zipWithIndex
